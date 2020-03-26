@@ -1,0 +1,102 @@
+
+library(readxl)
+library(tidyverse)
+library(ggrepel)
+library(ggthemes)
+library(lubridate)
+
+
+oas <- read_excel("Data/Spreads Dashboard.xlsx", sheet = "Raw - OAS")
+pxs <- read_excel("Data/Spreads Dashboard.xlsx", sheet = "Raw - TR Index Daily")
+lookup <- read_excel("Data/Spreads Dashboard.xlsx", sheet = "IndexTable")
+
+toas <- pivot_longer(oas, -date, names_to = "Factset", values_to = "OAS") %>% 
+  left_join(lookup, by = "Factset") %>% 
+  select(date, ShortName, Class, OAS)
+
+toas$Class <- factor(toas$Class, levels = c("IG", "HY"))
+toas$ShortName = factor(toas$ShortName,
+                        levels = c("IG - AAA",
+                                   "IG - AA",
+                                   "IG - A",
+                                   "IG - BAA",
+                                   "HY - BA",
+                                   "HY - B",
+                                   "HY - CAA",
+                                   "IG - Airlines",
+                                   "IG - Autos",
+                                   "IG - Energy",
+                                   "HY - Airlines",
+                                   "HY - Autos",
+                                   "HY - Banks",
+                                   "HY - Cons Cyclical",
+                                   "HY - Cons NonCyclical",
+                                   "HY - Energy",
+                                   "HY - Restaurants",
+                                   "HY - Retail"))
+
+
+
+
+maxdate <- max(na.omit(toas$date))
+mindate <- "2019-12-31"
+
+png(file="ratings.png",width = 700, height = 450, res = 100)
+
+# Rating Graph
+filter(toas, ShortName %in% c("IG - AA", "IG - A", "IG - BAA", "HY - BA", "HY - B", "HY - CAA"),
+       date >= as.Date(mindate)) %>% 
+  ggplot(aes(x = date, y = OAS*100, color = Class)) +
+  geom_line(size = 0.75) +
+  labs(title = "Credit Spreads, by Rating",
+       subtitle = paste0(mindate, " to ", maxdate),
+       x = "Date",
+       y = "OAS (bps)") +
+  geom_text_repel(aes(label=ifelse(date == maxdate, OAS*100,'')), colour = 'black', size = 3.5) +
+  geom_text_repel(aes(label=ifelse(date == as.Date(mindate), OAS*100,'')), colour = 'black', size = 3.5) +
+ # geom_text_repel(aes(label = ifelse(OAS == min(OAS), OAS*100,'')), colour = 'black', size = 3.5) +
+  facet_wrap(~ShortName, scales = "free_y", ncol = 3) +
+  theme_few() +
+  theme(legend.title = element_blank()) +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) +
+  scale_color_manual(values = c("#002247", "#D9B860"))
+
+dev.off()
+# Two charts
+# Grades nad sectors
+# Simple lines of spread
+# Keep clean. use color to denote HY and IG
+# 
+
+png(file="sectors.png",width = 700, height = 600, res = 100)
+
+
+filter(toas, ShortName %in% c("HY - Airlines",
+                              "HY - Autos",
+                              "HY - Banks",
+                              "HY - Energy",
+                              "HY - Restaurants",
+                              "HY - Retail",
+                              "IG - Airlines",
+                              "IG - Autos",
+                              "IG - Energy"),
+       date >= as.Date(mindate)) %>% 
+  ggplot(aes(x = date, y = OAS*100, color = Class)) +
+  geom_line(size = 0.75) + 
+  facet_wrap(~ShortName, scales = "free_y") +
+  geom_text_repel(aes(label=ifelse(date == maxdate, OAS*100,'')), 
+                  colour = 'black',
+                  size = 3) +
+  geom_text_repel(aes(label=ifelse(date == as.Date(mindate), OAS*100,'')), 
+                  colour = 'black',
+                  size = 3) +
+  labs(title = "Credit Spreads, by Sector",
+       subtitle = paste0(mindate, " to ", maxdate),
+       x = "Date",
+       y = "OAS (bps)") +
+  theme_few() +
+  theme(legend.title = element_blank()) +
+  scale_color_manual(values = c("#002247", "#D9B860"))
+
+dev.off()
+
